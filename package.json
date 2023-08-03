@@ -1,0 +1,17 @@
+{
+  "name": "2-private-blockchain",
+  "version": "1.0.0",
+  "description": "You are starting your journey as a Blockchain Developer, this project allows you to demonstrate that you are familiarized with the fundamentals concepts of a Blockchain platform. Concepts like:     - Block     - Blockchain     - Wallet     - Blockchain Identity     - Proof of Existance",
+  "main": "BlockchainController.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bitcoinjs-message": "^2.2.0",
+    "crypto-js": "^4.1.1",
+    "hex2ascii": "^0.0.3",
+    "morgan": "^1.10.0"
+  }
+}
