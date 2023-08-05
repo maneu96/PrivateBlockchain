@@ -38,9 +38,9 @@ class Block {
     validate() {
         let self = this;
         return new Promise((resolve, reject) => {
-            hash1 = self.hash;// Save in auxiliary variable the current block hash
-            // Para calcular o hash, tem de ser com o (hash do block )= null, pq senao o hash  vai ser diferente. criar copia do objeto mas com a propriedade hash =null                
-            hash2 = SHA256(JSON.stringify(self)).toString();// Recalculate the hash of the Block
+            let hash1 = self.hash;// Save in auxiliary variable the current block hash
+            // To calculate the hash of the block, the block needs to be reversed to the initial state. Thus Block.hash = null at the moment of the SHA256 calculation.             
+            let hash2 = SHA256(JSON.stringify({...self, "hash": null})).toString();// Recalculate the hash of the Block
             // Comparing if the hashes changed
             if(hash1 == hash2){
                 resolve(true); // Returning the Block is valid
@@ -63,20 +63,21 @@ class Block {
      *     or Reject with an error.
      */
     getBData() {
-        data = this.body;// Getting the encoded data saved in the Block
+        let self = this;
+        let data = this.body;// Getting the encoded data saved in the Block
         return new Promise((resolve,reject) =>{
             if(data){
                 if(self.height == 0){
                     resolve("Genesis Block")
                 }
-                //Resolve with the data if the object isn't the Genesis block
-                resolve(JSON.parse(hex2ascii(data)));  // Decoding the data to retrieve the JSON representation of the object, Parse the data to an object to be retrieved.
-            }
+            //Resolve with the data if the object isn't the Genesis block
+                resolve(JSON.parse(hex2ascii(data)));
+            } // Decoding the data to retrieve the JSON representation of the object, Parse the data to an object to be retrieved.
             else{
                 reject(Error("No data on block"));
             }
             
-        });
+            });
 
 
     }

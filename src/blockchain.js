@@ -37,6 +37,7 @@ class Blockchain {
         if( this.height === -1){
             let block = new BlockClass.Block({data: 'Genesis Block'});
             await this._addBlock(block);
+
         }
     }
 
@@ -44,8 +45,10 @@ class Blockchain {
      * Utility method that return a Promise that will resolve with the height of the chain
      */
     getChainHeight() {
+        let self= this;
         return new Promise((resolve, reject) => {
-            resolve(this.height);
+            //console.log(self.height);
+            resolve(self.height);
         });
     }
 
@@ -56,34 +59,49 @@ class Blockchain {
      * or reject if an error happen during the execution.
      * You will need to check for the height to assign the `previousBlockHash`,
      * assign the `timestamp` and the correct `height`...At the end you need to 
-     * create the `block hash` and push the block into the chain array. Don't for get 
+     * create the `block hash` and push the block into the chain array. Don't forget 
      * to update the `this.height`
      * Note: the symbol `_` in the method name indicates in the javascript convention 
      * that this method is a private method. 
      */
-    _addBlock(block) {
-        let self = this;
-
-        return new Promise(async (resolve, reject) => {
+    async _addBlock(block) {  
+    
+        try {
+            let currentChainHeight = this.height;
             
-            let currentChainHeight = await self.getChainHeight();
             let newChainHeight = currentChainHeight + 1;
-            let previousBlock = await self.getBlockByHeight(currentChainHeight);
-             
+     
+            
             block.height = newChainHeight;
+            this.height = newChainHeight;
             block.time = new Date().getTime().toString().slice(0,-3);
-            block.hash = SHA256(JSON.stringify(block)).toString();
+         
+
             
             if(newChainHeight > 0){   // If it is not the Genesis block
+                let previousBlock = await this.getBlockByHeight(currentChainHeight);
                 block.previousBlockHash = previousBlock.hash;
+        
             }
             else{
                 block.previousBlockHash = null;
             }
-            self.chain.push(block);
-            self.height = newChainHeight;
-           resolve(block);
-        });
+            block.hash = SHA256(JSON.stringify(block)).toString();
+            this.chain.push(block);
+            let errorLog = await this.validateChain();
+       
+            if(errorLog.length > 0){
+                this.chain.pop();
+                this.height = this.height - 1 ;
+            }
+            //console.log(block);
+            return(block);
+        } 
+        catch  {
+            return("Invalid block");
+        }
+        
+     
     }
 
     /**
@@ -113,14 +131,30 @@ class Blockchain {
      * 5. Create the block and add it to the chain
      * 6. Resolve with the block added.
      * @param {*} address 
-     * @param {*} message 
+     * @param {*} message    // message = "WALLET_ADDRESS:timeStamp:starRegistry"
      * @param {*} signature 
      * @param {*} star 
      */
     submitStar(address, message, signature, star) {
         let self = this;
         return new Promise(async (resolve, reject) => {
+            //walletAddress = 
+            let timeStamp = parseInt(message.split(':')[1]);
+            let currentTime =  new Date().getTime().toString().slice(0,-3);
+            if (currentTime - timeStamp <= 5 * 60){
+                try{
+                    let verification = bitcoinMessage.verify(message, address, signature);
+                }
+                catch{
+                    reject(Error("Validation Error"));
+                }
+                let newBlock = new BlockClass.Block({ walletAddress: address, message: message, signature: signature, star: star })
+                resolve(self._addBlock(newBlock))
             
+            }
+            else{
+                reject(Error("Time expired (5 min)"));
+            }
         });
     }
 
@@ -133,7 +167,13 @@ class Blockchain {
     getBlockByHash(hash) {
         let self = this;
         return new Promise((resolve, reject) => {
-           
+           let block = self.chain.filter(p => p.hash === hash);
+           if(block){
+            resolve(block);
+           }
+           else{
+            resolve(null);
+           }
         });
     }
 
@@ -164,7 +204,14 @@ class Blockchain {
         let self = this;
         let stars = [];
         return new Promise((resolve, reject) => {
-            
+            let chain = self.chain;
+            chain.forEach(async block =>{
+                let body = await block.getBData();
+                if(body.walletAddress == address){
+                    stars.push(body.star);
+                }   
+            })
+            resolve(stars);
         });
     }
 
@@ -177,11 +224,46 @@ class Blockchain {
     validateChain() {
         let self = this;
         let errorLog = [];
-        return new Promise(async (resolve, reject) => {
-            
+        return new Promise((resolve, reject) => {
+            self.chain.forEach(async block => {
+                if(await block.validate()){
+                    //console.log(block.previousBlockHash, await self.getBlockByHeight(block.height - 1))
+                    if(block.height > 0 && block.previousBlockHash != await self.getBlockByHeight(block.height - 1).hash){
+                        errorLog.push({Error: `For Block ${block.height}, the PreviousBlock hash is invalid`});
+                    }
+                }
+                else{
+                    errorLog.push({Error: `Block ${block.height} is invalid`});
+                }
+
+            })
+            resolve(errorLog);
+
         });
     }
 
 }
 
 module.exports.Blockchain = Blockchain;   
+
+// message: tb1q6g4f8nhvsxskyz0ug8dcz7ger6c4chep5tvcmr:${new Date().getTime().toString().slice(0,-3)}:starRegistry
+/* async function test(){
+    let x = new Blockchain();
+    await x.submitStar("miABqhtwMc8krfKT22zwKoq9WGorXzSWPW","miABqhtwMc8krfKT22zwKoq9WGorXzSWPW:1691239150:starRegistry","IE7IR7aFJ14zXN5UDh14sevRWCNJYrms3g61nLo4T6lATXeS1IlF7CtzZQ+B+E6yfCI4T8Z6RPE9mhZhgVbOL/Y="
+    ,{
+        "dec": "68° 52' 56.9",
+        "ra": "16h 29m 1.0s",
+        "story": "Testing the story 4"
+	})
+    console.log(x)
+    //console.log(`tb1q6g4f8nhvsxskyz0ug8dcz7ger6c4chep5tvcmr:${new Date().getTime().toString().slice(0,-3)}:starRegistry`)
+}
+test(); 
+ */
+
+// private key : cTeFSbaHJ4DccndqbiX7BJqiYKRd1kSG7Xhf4F96Fqnd52XAYRAt //NOT USED
+
+// wallet address : miABqhtwMc8krfKT22zwKoq9WGorXzSWPW
+// message: miABqhtwMc8krfKT22zwKoq9WGorXzSWPW:1691239150:starRegistry
+// signature : IE7IR7aFJ14zXN5UDh14sevRWCNJYrms3g61nLo4T6lATXeS1IlF7CtzZQ+B+E6yfCI4T8Z6RPE9mhZhgVbOL/Y=
+//bitcoinMessage.verify("miABqhtwMc8krfKT22zwKoq9WGorXzSWPW:1691239150:starRegistry","miABqhtwMc8krfKT22zwKoq9WGorXzSWPW","IE7IR7aFJ14zXN5UDh14sevRWCNJYrms3g61nLo4T6lATXeS1IlF7CtzZQ+B+E6yfCI4T8Z6RPE9mhZhgVbOL/Y=")
